@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Add folder — Sync Manager</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #111; color: #eee; }
+    a { color: #6cb4ff; }
+    fieldset { border: 1px solid #333; border-radius: 6px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; max-width: 640px; }
+    legend { color: #888; text-transform: uppercase; font-size: 0.75rem; padding: 0 0.5rem; }
+    label { display: block; margin-top: 0.75rem; font-size: 0.9rem; color: #ccc; }
+    input[type=text], input[type=number] { width: 100%; padding: 0.4rem; margin-top: 0.25rem; background: #1a1a1a; border: 1px solid #333; color: #eee; border-radius: 4px; box-sizing: border-box; }
+    .path-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .path-row input { flex: 1; }
+    .browse-link { white-space: nowrap; padding: 0.4rem 0.75rem; border: 1px solid #333; border-radius: 4px; text-decoration: none; }
+    button { margin-top: 1rem; padding: 0.5rem 1.25rem; background: #2f6fbf; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .error { color: #f44336; margin-bottom: 1rem; }
+    .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
+    .checkbox-row label { margin: 0; }
+  </style>
+</head>
+<body>
+  <p><a href="/">&larr; Back to status</a></p>
+  <h1>Add a managed folder</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/add/hot_data">
+    <fieldset>
+      <legend>Hot Data</legend>
+      <label for="hd-path">Folder to watch</label>
+      <div class="path-row">
+        <input type="text" id="hd-path" name="path" value="{{ path }}" placeholder="/srv/hotdata/documents">
+        <a class="browse-link" href="{{ url_for('browse', target='path', versions_to_keep=versions_to_keep) }}">Browse&hellip;</a>
+      </div>
+      <label for="hd-versions">Versions to keep</label>
+      <input type="number" id="hd-versions" name="versions_to_keep" value="{{ versions_to_keep }}" min="1">
+      <button type="submit">Add Hot Data folder</button>
+    </fieldset>
+  </form>
+
+  <form method="post" action="/add/wechat_vault">
+    <fieldset>
+      <legend>WeChat Vault</legend>
+      <label for="wv-staging">Staging path (what the active machine's WeChat client writes to)</label>
+      <div class="path-row">
+        <input type="text" id="wv-staging" name="staging_path" value="{{ staging_path }}" placeholder="/srv/wechat/staging">
+        <a class="browse-link" href="{{ url_for('browse', target='staging_path', vault_path=vault_path, promote_interval_minutes=promote_interval_minutes) }}">Browse&hellip;</a>
+      </div>
+      <label for="wv-vault">Vault path (the shared, promoted copy)</label>
+      <div class="path-row">
+        <input type="text" id="wv-vault" name="vault_path" value="{{ vault_path }}" placeholder="/srv/vault/wechat">
+        <a class="browse-link" href="{{ url_for('browse', target='vault_path', staging_path=staging_path, promote_interval_minutes=promote_interval_minutes) }}">Browse&hellip;</a>
+      </div>
+      <label for="wv-interval">Promote interval (minutes)</label>
+      <input type="number" id="wv-interval" name="promote_interval_minutes" value="{{ promote_interval_minutes }}" min="1">
+      <div class="checkbox-row">
+        <input type="checkbox" id="wv-keep-failed" name="keep_failed_staging" checked>
+        <label for="wv-keep-failed">Keep a copy of staging if a promotion fails</label>
+      </div>
+      <button type="submit">Add WeChat Vault folder</button>
+    </fieldset>
+  </form>
+</body>
+</html>

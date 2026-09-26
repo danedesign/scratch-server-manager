@@ -1,0 +1,10 @@
+folders:
+  - path: /srv/hotdata/documents
+    profile: hot_data
+    versions_to_keep: 5
+
+  - profile: wechat_vault
+    staging_path: /srv/wechat/staging
+    vault_path: /srv/vault/wechat
+    promote_interval_minutes: 60
+    keep_failed_staging: true
