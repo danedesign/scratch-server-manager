@@ -26,20 +26,18 @@ All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeCha
 - ✅ **Two real machines promoting to the same vault, verified with genuinely separate hardware** — a macOS laptop over Tailscale, not just another VM on the same host, mounting the Debian VM's Samba vault share directly; the single-writer sanity check warned correctly in both directions without ever blocking a promotion
 - ✅ Dashboard UI for editing an existing folder's settings (`/folders/{hot_data,wechat_vault}/edit`) — verified live in a real browser, including the folder-browse picker round-trip
 - ✅ CI running the test suite automatically (`.github/workflows/tests.yml`) — runs `pytest` on every push/PR to `main`; verified with a real GitHub Actions run, not just the YAML being plausible: all 89 tests passed in 25s
+- ✅ **WeChat staging topology decided**: `staging_path` must be local disk on whichever machine is logged into WeChat, never a Samba/CIFS mount (the CIFS/SQLite locking finding from Samba testing made this a real requirement, not a style preference) — getting it onto the Debian host is left to something transport-level underneath (Syncthing, rsync, etc.), the same assumption Hot Data already makes. `vault_path` has no such restriction and was verified as a Samba mount, including across two real machines. Documented in `CLAUDE.md`'s Config format section; no code change needed since this app never writes SQLite itself.
 
 ## Open items, priority-ranked by risk (not by effort)
 
 | # | Item | Status | Why it matters |
 |---|------|--------|-----------------|
-| 1 | WeChat staging path must not be a direct Samba/CIFS mount | 🚫 Blocked, needs a decision | Confirmed on real Debian: SQLite fails to even create a table on a loopback CIFS mount (`database is locked`), reproducibly, not just under contention. This app's own code never writes SQLite directly so it's unaffected, but if a remote WeChat client is pointed at a `staging_path` that's itself a live Samba mount, WeChat's own writes would fail outright. Needs a decision: require `staging_path` to be a local disk path that's synced to the Samba host some other way (e.g. Syncthing, like Hot Data), or document that WeChat must never write directly over the share. Not a bug to fix in this codebase — a deployment/topology constraint to decide and document. |
-| 2 | Syncthing status integration for Hot Data | ⬜ Not started | Dashboard shows "watching," not real Syncthing sync state. |
-| 3 | Logout-event promotion trigger | ⬜ Not started, deliberately deferred | Platform-specific, no way to test it from this dev environment. |
+| 1 | Syncthing status integration for Hot Data | ⬜ Not started | Dashboard shows "watching," not real Syncthing sync state. |
+| 2 | Logout-event promotion trigger | ⬜ Not started, deliberately deferred | Platform-specific, no way to test it from this dev environment. |
 
 ## Recommended next step
 
-**#1 — Decide the WeChat staging topology** is the only item left that isn't either done or deliberately deferred. Samba testing (done) surfaced a real constraint, not a code bug: this app's own file operations (copy, rename, read-only integrity checks) all work correctly over a real CIFS mount, but a remote WeChat client cannot safely write its live SQLite databases directly onto one — `sqlite3` can't take the lock it needs. Decide how a remote machine's WeChat client actually gets its files into `staging_path`: most likely, `staging_path` should be a local disk path on whichever machine is currently logged into WeChat, kept in sync to the Debian host by something transport-level (Syncthing, rsync, etc.) the same way Hot Data already assumes Syncthing underneath it — rather than WeChat writing straight to a mounted share. This is a one-line decision plus a `CLAUDE.md` clarification, not new code, unless the decision is to add a check that refuses to run WeChat Vault against a detected network filesystem.
-
-After that, Syncthing status integration (#2) is the only remaining build-something item with real value; the logout trigger (#3) stays deliberately deferred as untestable from this dev environment.
+**#1 — Syncthing status integration for Hot Data** is the only remaining item with real build value; the logout trigger (#2) stays deliberately deferred as untestable from this dev environment. Query Syncthing's local REST API (it runs alongside this app, per the original design — see Hot Data, below) to surface real sync state on the dashboard instead of just "we saw a local change."
 
 ## Maintaining this file
 
