@@ -242,6 +242,11 @@ def create_app(manager) -> Flask:
             profile.promote_now()
         return redirect(url_for("status"))
 
+    @app.route("/folders/wechat_vault/verify", methods=["POST"])
+    def verify_wechat_vault():
+        manager.verify_wechat_vault(Path(request.form.get("staging_path", "")))
+        return redirect(url_for("status"))
+
     @app.route("/browse")
     def browse():
         target = request.args.get("target", "path")

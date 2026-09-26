@@ -282,6 +282,22 @@ def test_edit_wechat_vault_rejects_same_staging_and_vault(client, tmp_path):
     assert b"must be different" in resp.data
 
 
+def test_wechat_vault_verify_route(client, tmp_path):
+    staging = tmp_path / "staging"
+    vault = tmp_path / "vault"
+    staging.mkdir()
+    make_sqlite_db(staging / "MSG0.db")
+    client.cfg_path.write_text(
+        f"folders:\n- profile: wechat_vault\n  staging_path: {staging.as_posix()}\n  vault_path: {vault.as_posix()}\n"
+    )
+    client.manager.reload()
+
+    resp = client.post("/folders/wechat_vault/verify", data={"staging_path": str(staging)})
+    assert resp.status_code == 302
+    row = client.manager.status()[0]
+    assert "verified ok" in row.reason
+
+
 def test_wechat_vault_pause_promote_resume_via_routes(client, tmp_path):
     staging = tmp_path / "staging"
     vault = tmp_path / "vault"

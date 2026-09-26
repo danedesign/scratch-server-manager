@@ -227,6 +227,100 @@ def test_wechat_vault_status_unaffected_when_syncthing_unconfigured(manager, tmp
     assert "syncthing" not in row.reason
 
 
+def test_verify_wechat_vault_ok_when_synced_and_integrity_clean(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    write_config(cfg_path, f"""
+folders:
+  - profile: wechat_vault
+    staging_path: {staging.as_posix()}
+    vault_path: {vault.as_posix()}
+    syncthing_folder_id: wechat-staging
+""")
+    m.reload()
+
+    monkeypatch.setattr(
+        "main.get_folder_status",
+        lambda folder_id: {"state": "idle", "needBytes": 0, "errors": 0},
+    )
+    result = m.verify_wechat_vault(staging)
+    assert result.ok
+    assert "fully synced" in result.reason
+    assert "integrity:" in result.reason
+
+
+def test_verify_wechat_vault_fails_when_syncthing_has_pending_bytes(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    write_config(cfg_path, f"""
+folders:
+  - profile: wechat_vault
+    staging_path: {staging.as_posix()}
+    vault_path: {vault.as_posix()}
+    syncthing_folder_id: wechat-staging
+""")
+    m.reload()
+
+    monkeypatch.setattr(
+        "main.get_folder_status",
+        lambda folder_id: {"state": "syncing", "needBytes": 4096, "errors": 0},
+    )
+    result = m.verify_wechat_vault(staging)
+    assert not result.ok
+    assert "4096 byte(s) pending" in result.reason
+
+
+def test_verify_wechat_vault_fails_when_integrity_check_fails(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    with open(staging / "MSG0.db", "r+b") as f:
+        f.seek(100)
+        f.write(b"\x00" * 200)
+    write_config(cfg_path, wechat_config(staging, vault))
+    m.reload()
+
+    result = m.verify_wechat_vault(staging)
+    assert not result.ok
+
+
+def test_verify_wechat_vault_notes_missing_syncthing_config(manager, tmp_path):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    write_config(cfg_path, wechat_config(staging, vault))
+    m.reload()
+
+    result = m.verify_wechat_vault(staging)
+    assert "not checked" in result.reason
+
+
+def test_verify_wechat_vault_unknown_folder_fails_cleanly(manager, tmp_path):
+    m, cfg_path = manager
+    result = m.verify_wechat_vault(tmp_path / "nonexistent")
+    assert not result.ok
+    assert "not configured" in result.reason
+
+
+def test_status_reflects_last_verify_result(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    write_config(cfg_path, f"""
+folders:
+  - profile: wechat_vault
+    staging_path: {staging.as_posix()}
+    vault_path: {vault.as_posix()}
+    syncthing_folder_id: wechat-staging
+""")
+    m.reload()
+
+    monkeypatch.setattr(
+        "main.get_folder_status",
+        lambda folder_id: {"state": "idle", "needBytes": 0, "errors": 0},
+    )
+    m.verify_wechat_vault(staging)
+    row = m.status()[0]
+    assert "verified ok" in row.reason
+
+
 def test_wechat_vault_add_schedules_a_job(manager, tmp_path):
     m, cfg_path = manager
     staging, vault = make_vault_folders(tmp_path)

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from engine.config import HotDataFolderConfig, WeChatVaultFolderConfig, load_config
+from engine.integrity import wechat_vault_integrity_check
 from engine.logger import get_logger
 from engine.scheduler import PromotionScheduler
 from engine.syncthing import get_folder_status, summarize_status
@@ -28,6 +29,13 @@ class FolderStatus:
     status: str
     reason: str = ""
     paused: bool = False
+
+
+@dataclass
+class VerifyResult:
+    ok: bool
+    reason: str
+    checked_at: float
 
 
 def _format_time(epoch: Optional[float]) -> Optional[str]:
@@ -57,6 +65,7 @@ class Manager:
         self._hot_data_last_known: dict[Path, tuple] = {}
         self.wechat_vault_profiles: dict[Path, WeChatVaultProfile] = {}
         self._wechat_vault_configs: dict[Path, WeChatVaultFolderConfig] = {}
+        self._wechat_vault_last_verify: dict[Path, VerifyResult] = {}
         self._scheduler = PromotionScheduler()
 
     def reload(self) -> None:
@@ -162,6 +171,54 @@ class Manager:
                 profile.promote_now()
         return callback
 
+    def verify_wechat_vault(self, staging_path: Path) -> VerifyResult:
+        """On-demand "Verify" action: checks that staging is actually fully and
+        correctly synced, combining the two strongest signals available without
+        deploying anything new to the machine running WeChat. (1) Syncthing's own
+        transfer-completion state - it verifies every synced file block-by-block
+        via SHA256 during transfer, so "0 bytes pending, no errors" is already a
+        real content-level guarantee, not just a filename/size comparison. (2) A
+        fresh engine.integrity check run right now against staging, comparing it
+        to the live vault - catches anything Syncthing wouldn't know to flag,
+        e.g. a file that synced correctly but was already corrupt/truncated at
+        the source. Neither signal alone is as strong as an independent
+        cross-machine hash recompute would be, but combined they need no new
+        infrastructure on the WeChat machine, which is what was asked for."""
+        cfg = self._wechat_vault_configs.get(staging_path)
+        if cfg is None:
+            result = VerifyResult(False, "folder not configured", time.time())
+            self._wechat_vault_last_verify[staging_path] = result
+            return result
+
+        parts = []
+        ok = True
+
+        if cfg.syncthing_folder_id:
+            syncthing_status = get_folder_status(cfg.syncthing_folder_id)
+            if syncthing_status is None:
+                ok = False
+                parts.append("syncthing status unavailable (check SYNC_MANAGER_SYNCTHING_API_KEY / connectivity)")
+            else:
+                need_bytes = syncthing_status.get("needBytes", 0)
+                errors = syncthing_status.get("errors", 0)
+                if need_bytes or errors:
+                    ok = False
+                    parts.append(f"syncthing not fully synced: {need_bytes} byte(s) pending, {errors} error(s)")
+                else:
+                    parts.append(f"syncthing: {syncthing_status.get('state', 'unknown')}, fully synced (0 bytes pending, 0 errors)")
+        else:
+            parts.append("no syncthing_folder_id configured - sync completeness not checked")
+
+        last_good = cfg.vault_path if cfg.vault_path.is_dir() else None
+        integrity = wechat_vault_integrity_check(cfg.staging_path, last_good_path=last_good)
+        if not integrity.ok:
+            ok = False
+        parts.append(f"integrity: {integrity.reason}")
+
+        result = VerifyResult(ok, "; ".join(parts), time.time())
+        self._wechat_vault_last_verify[staging_path] = result
+        return result
+
     def stop_all(self) -> None:
         for profile in self._hot_data_profiles.values():
             profile.stop()
@@ -223,6 +280,14 @@ class Manager:
                 syncthing_status = get_folder_status(cfg.syncthing_folder_id)
                 if syncthing_status is not None:
                     reason = f"{reason} ({summarize_status(syncthing_status)})"
+
+            verify = self._wechat_vault_last_verify.get(staging_path)
+            if verify is not None:
+                verified_at = _format_time(verify.checked_at)
+                if verify.ok:
+                    reason = f"{reason} [verified ok @ {verified_at}]"
+                else:
+                    reason = f"{reason} [VERIFY FAILED @ {verified_at}: {verify.reason}]"
 
             rows.append(FolderStatus(
                 profile="wechat_vault",

@@ -72,6 +72,10 @@
               <input type="hidden" name="staging_path" value="{{ row.path }}">
               <button type="submit">Promote now</button>
             </form>
+            <form method="post" action="/folders/wechat_vault/verify">
+              <input type="hidden" name="staging_path" value="{{ row.path }}">
+              <button type="submit">Verify</button>
+            </form>
             {% if row.paused %}
             <form method="post" action="/folders/wechat_vault/resume">
               <input type="hidden" name="staging_path" value="{{ row.path }}">
