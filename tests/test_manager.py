@@ -90,6 +90,42 @@ def test_hot_data_resume_starts_a_fresh_watcher(manager, tmp_path):
     assert wait_until(lambda: m.status()[0].last_activity is not None)
 
 
+def test_hot_data_settings_change_restarts_watcher_live(manager, tmp_path):
+    """The gap this closes: changing versions_to_keep on an already-running
+    folder used to be silently ignored until the app restarted, since reload()
+    only diffed on path presence. watchdog's Observer can't be updated in
+    place, so "live" here means the watcher is stopped and a fresh one started
+    with the new settings on the next reload - no restart of the app itself."""
+    m, cfg_path = manager
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    write_config(cfg_path, f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n  versions_to_keep: 3\n")
+    m.reload()
+    profile_before = m._hot_data_profiles[watched]
+    assert profile_before.versions_to_keep == 3
+
+    write_config(cfg_path, f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n  versions_to_keep: 7\n")
+    m.reload()
+    profile_after = m._hot_data_profiles[watched]
+    assert profile_after.versions_to_keep == 7
+    assert profile_after is not profile_before, "a fresh profile is required - the old watcher can't be reused"
+
+    (watched / "f.txt").write_text("hi")
+    assert wait_until(lambda: m.status()[0].last_activity is not None), "the new watcher must actually be running"
+
+
+def test_hot_data_unrelated_reload_does_not_restart_watcher(manager, tmp_path):
+    m, cfg_path = manager
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    write_config(cfg_path, f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n  versions_to_keep: 3\n")
+    m.reload()
+    profile_before = m._hot_data_profiles[watched]
+
+    m.reload()  # nothing changed
+    assert m._hot_data_profiles[watched] is profile_before, "an unrelated reload must not restart the watcher"
+
+
 def test_hot_data_nonexistent_path_does_not_crash_reload(manager, tmp_path):
     m, cfg_path = manager
     good = tmp_path / "good"

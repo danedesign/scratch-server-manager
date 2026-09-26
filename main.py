@@ -41,10 +41,11 @@ def _version_dir_for(cfg: HotDataFolderConfig) -> Path:
 
 class Manager:
     """Starts/stops profiles to match folders.yaml. Both profiles support add,
-    remove, and pause/resume live; changing other settings on an already-running
-    Hot Data folder still needs a restart (Milestone 5's scope never grew to cover
-    that - WeChat Vault's diffing is stricter and does pick up other changes, since
-    it has to compare configs anyway to know whether to touch the schedule).
+    remove, pause/resume, and live settings changes without a restart - a Hot
+    Data folder whose versions_to_keep or version_dir changes gets its watcher
+    stopped and restarted with the new settings (there's no way to update an
+    already-running watchdog Observer in place, so "live" here means "on the
+    next reload, no app restart needed", same as everything else in this class).
     Pausing a WeChat Vault folder unschedules its job without losing its config or
     its manual "Promote now" availability - only the automatic side is paused."""
 
@@ -60,14 +61,21 @@ class Manager:
     def reload(self) -> None:
         configs = load_config(self.config_path)
         wanted_hot_data = {c.path: c for c in configs if isinstance(c, HotDataFolderConfig)}
-        self._hot_data_configs = wanted_hot_data
 
         for path in list(self._hot_data_profiles):
             cfg = wanted_hot_data.get(path)
-            if cfg is None or cfg.paused:
+            old_cfg = self._hot_data_configs.get(path)
+            settings_changed = cfg is not None and not cfg.paused and old_cfg is not None and old_cfg != cfg
+            if cfg is None or cfg.paused or settings_changed:
                 profile = self._hot_data_profiles.pop(path)
                 self._hot_data_last_known[path] = (profile.last_event_at, profile.last_event_type)
-                logger.info("Stopping Hot Data profile for %s (%s)", path, "paused" if cfg else "removed from config")
+                if cfg is None:
+                    reason = "removed from config"
+                elif cfg.paused:
+                    reason = "paused"
+                else:
+                    reason = "settings changed"
+                logger.info("Stopping Hot Data profile for %s (%s)", path, reason)
                 profile.stop()
 
         for path, cfg in wanted_hot_data.items():
@@ -84,6 +92,8 @@ class Manager:
             self._hot_data_profiles[path] = profile
             self._hot_data_last_known.pop(path, None)
             logger.info("Started Hot Data profile for %s", path)
+
+        self._hot_data_configs = wanted_hot_data
 
         wanted_vault = {c.staging_path: c for c in configs if isinstance(c, WeChatVaultFolderConfig)}
 
