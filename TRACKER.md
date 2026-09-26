@@ -13,6 +13,8 @@ Legend: ✅ done & verified · 🔶 partially done · ⬜ not started · 🚫 bl
 
 **In real use as of 2026-09-27**, not just verified against test fixtures. `sync-manager.service` and `syncthing@dane` both run as persistent systemd services on the Debian VM. A real WeChat client on a Windows 11 PC (`C:\Users\DL-Work\Documents\xwechat_files`) is paired via Syncthing (PC: Send Only → VM `staging_path` `/home/dane/wechat-staging`: Receive Only, enforced one-way in both directions so staging can never write back to the live WeChat client) to the VM's `wechat_vault` profile, auto-promoting every 30 minutes into the Samba-shared vault at `/srv/samba/wechat-vault/vaultdata`. First real promotion: 318 synced files, integrity check passed, 319 files confirmed in the vault afterward. `config/folders.yaml` on the VM now holds this real entry and is gitignored (see Post-v1 additions) rather than the placeholder that used to be tracked in git.
 
+The real `wechat_vault` entry also has `syncthing_folder_id: wechat-staging` set, and `/etc/sync-manager.env` holds the real Syncthing API key (loaded via the unit's `EnvironmentFile=`) — the dashboard's single status row is now the complete picture: `ok — sqlite integrity ok, size/count within expected range (next auto-promote ...) (syncthing: idle)`. Nothing about this deployment requires opening Syncthing's own UI day-to-day.
+
 ## v1 scope (original 9 build-order milestones)
 
 All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeChat Vault (staged + SQLite-integrity-checked + atomically promoted), config loading with hot-reload, Flask dashboard, folder picker, manual controls, persistent logging + pluggable alerting.
