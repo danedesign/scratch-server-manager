@@ -8,6 +8,12 @@ Type=simple
 User=dane
 Group=dane
 WorkingDirectory=/home/dane/scratch-server-manager
+# Optional (the leading "-" means systemd won't fail to start if this file is
+# missing): holds secrets that shouldn't live in this unit file itself, e.g.
+# SYNC_MANAGER_SYNCTHING_API_KEY, SYNC_MANAGER_NTFY_URL. Create it with
+# 0600 permissions owned by the service user - see CLAUDE.md's Syncthing
+# section for the exact setup commands.
+EnvironmentFile=-/etc/sync-manager.env
 ExecStart=/home/dane/scratch-server-manager/.venv/bin/python main.py config/folders.yaml
 # main.py has no intentional exit path today (it blocks in app.run()) - so
 # Restart=always covers both a crash and a bug that lets it return, not
