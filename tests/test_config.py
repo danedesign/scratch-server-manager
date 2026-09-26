@@ -10,6 +10,7 @@ from engine.config import (
     append_folder,
     load_config,
     set_paused,
+    update_folder,
 )
 
 
@@ -114,6 +115,44 @@ folders:
     set_paused(cfg_path, "wechat_vault", "staging_path", "/srv/wechat/staging", True)
     configs = load_config(cfg_path)
     assert configs[0].paused is True
+
+
+def test_update_folder_hot_data(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, "folders:\n- profile: hot_data\n  path: /srv/hotdata/documents\n  versions_to_keep: 5\n")
+    update_folder(cfg_path, "hot_data", "path", "/srv/hotdata/documents", {"versions_to_keep": 9})
+    configs = load_config(cfg_path)
+    assert configs[0].versions_to_keep == 9
+    assert configs[0].path == Path("/srv/hotdata/documents")  # unrelated field untouched
+
+
+def test_update_folder_wechat_vault(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, """
+folders:
+  - profile: wechat_vault
+    staging_path: /srv/wechat/staging
+    vault_path: /srv/vault/wechat
+    promote_interval_minutes: 60
+    keep_failed_staging: true
+""")
+    update_folder(cfg_path, "wechat_vault", "staging_path", "/srv/wechat/staging", {
+        "vault_path": "/srv/vault/wechat-new",
+        "promote_interval_minutes": 15,
+        "keep_failed_staging": False,
+    })
+    configs = load_config(cfg_path)
+    assert configs[0].vault_path == Path("/srv/vault/wechat-new")
+    assert configs[0].promote_interval_minutes == 15
+    assert configs[0].keep_failed_staging is False
+
+
+def test_update_folder_no_match_leaves_file_unchanged(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, "folders:\n- profile: hot_data\n  path: /a\n  versions_to_keep: 5\n")
+    update_folder(cfg_path, "hot_data", "path", "/does-not-exist", {"versions_to_keep": 99})
+    configs = load_config(cfg_path)
+    assert configs[0].versions_to_keep == 5
 
 
 @pytest.mark.skipif(

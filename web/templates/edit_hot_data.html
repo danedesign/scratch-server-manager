@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Edit folder — Sync Manager</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #111; color: #eee; }
+    a { color: #6cb4ff; }
+    fieldset { border: 1px solid #333; border-radius: 6px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; max-width: 640px; }
+    legend { color: #888; text-transform: uppercase; font-size: 0.75rem; padding: 0 0.5rem; }
+    label { display: block; margin-top: 0.75rem; font-size: 0.9rem; color: #ccc; }
+    input[type=text], input[type=number] { width: 100%; padding: 0.4rem; margin-top: 0.25rem; background: #1a1a1a; border: 1px solid #333; color: #eee; border-radius: 4px; box-sizing: border-box; }
+    input[readonly] { color: #888; }
+    button { margin-top: 1rem; padding: 0.5rem 1.25rem; background: #2f6fbf; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .error { color: #f44336; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <p><a href="/">&larr; Back to status</a></p>
+  <h1>Edit Hot Data folder</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/folders/hot_data/edit">
+    <fieldset>
+      <legend>Hot Data</legend>
+      <label for="hd-path">Watched folder (not editable here — remove and re-add to change it)</label>
+      <input type="text" id="hd-path" value="{{ path }}" readonly>
+      <input type="hidden" name="path" value="{{ path }}">
+      <label for="hd-versions">Versions to keep</label>
+      <input type="number" id="hd-versions" name="versions_to_keep" value="{{ versions_to_keep }}" min="1">
+      <button type="submit">Save changes</button>
+    </fieldset>
+  </form>
+</body>
+</html>

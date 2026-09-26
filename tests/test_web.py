@@ -139,6 +139,97 @@ def test_hot_data_pause_resume_via_routes(client, tmp_path):
     assert client.manager.status()[0].status == "ok"
 
 
+def test_edit_hot_data_form_prefills_from_config(client, tmp_path):
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    client.cfg_path.write_text(f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n  versions_to_keep: 4\n")
+    client.manager.reload()
+
+    resp = client.get(f"/folders/hot_data/edit?path={watched}")
+    assert resp.status_code == 200
+    assert b'value="4"' in resp.data
+
+
+def test_edit_hot_data_updates_versions_to_keep(client, tmp_path):
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    client.cfg_path.write_text(f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n  versions_to_keep: 4\n")
+    client.manager.reload()
+
+    resp = client.post("/folders/hot_data/edit", data={"path": str(watched), "versions_to_keep": "9"})
+    assert resp.status_code == 302
+    client.manager.reload()
+    assert client.manager._hot_data_configs[watched].versions_to_keep == 9
+
+
+def test_edit_hot_data_rejects_non_integer_versions(client, tmp_path):
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    client.cfg_path.write_text(f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n  versions_to_keep: 4\n")
+    client.manager.reload()
+
+    resp = client.post(
+        "/folders/hot_data/edit", data={"path": str(watched), "versions_to_keep": "not-a-number"}, follow_redirects=True
+    )
+    assert b"positive integer" in resp.data
+
+
+def test_edit_wechat_vault_form_prefills_from_config(client, tmp_path):
+    staging = tmp_path / "staging"
+    vault = tmp_path / "vault"
+    staging.mkdir()
+    client.cfg_path.write_text(
+        f"folders:\n- profile: wechat_vault\n  staging_path: {staging.as_posix()}\n"
+        f"  vault_path: {vault.as_posix()}\n  promote_interval_minutes: 45\n"
+    )
+    client.manager.reload()
+
+    resp = client.get(f"/folders/wechat_vault/edit?staging_path={staging}")
+    assert resp.status_code == 200
+    assert b'value="45"' in resp.data
+
+
+def test_edit_wechat_vault_updates_settings(client, tmp_path):
+    staging = tmp_path / "staging"
+    vault = tmp_path / "vault"
+    new_vault = tmp_path / "vault2"
+    staging.mkdir()
+    client.cfg_path.write_text(
+        f"folders:\n- profile: wechat_vault\n  staging_path: {staging.as_posix()}\n"
+        f"  vault_path: {vault.as_posix()}\n  promote_interval_minutes: 60\n"
+    )
+    client.manager.reload()
+
+    resp = client.post("/folders/wechat_vault/edit", data={
+        "staging_path": str(staging),
+        "vault_path": str(new_vault),
+        "promote_interval_minutes": "10",
+    })
+    assert resp.status_code == 302
+    client.manager.reload()
+    cfg = client.manager._wechat_vault_configs[staging]
+    assert cfg.vault_path == new_vault
+    assert cfg.promote_interval_minutes == 10
+    assert cfg.keep_failed_staging is False  # checkbox omitted from posted data
+
+
+def test_edit_wechat_vault_rejects_same_staging_and_vault(client, tmp_path):
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    client.cfg_path.write_text(
+        f"folders:\n- profile: wechat_vault\n  staging_path: {staging.as_posix()}\n"
+        f"  vault_path: {(staging.parent / 'vault').as_posix()}\n"
+    )
+    client.manager.reload()
+
+    resp = client.post(
+        "/folders/wechat_vault/edit",
+        data={"staging_path": str(staging), "vault_path": str(staging), "promote_interval_minutes": "60"},
+        follow_redirects=True,
+    )
+    assert b"must be different" in resp.data
+
+
 def test_wechat_vault_pause_promote_resume_via_routes(client, tmp_path):
     staging = tmp_path / "staging"
     vault = tmp_path / "vault"

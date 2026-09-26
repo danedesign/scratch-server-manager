@@ -99,3 +99,21 @@ def set_paused(config_path: Path, profile: str, match_key: str, match_value: str
             entry["paused"] = paused
             break
     config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+
+def update_folder(config_path: Path, profile: str, match_key: str, match_value: str, updates: dict) -> None:
+    """Merges `updates` into the entry matching `profile` and `match_key` - the
+    dashboard's settings-edit form. Deliberately can't change `match_key` itself
+    (`path` for hot_data, `staging_path` for wechat_vault): that's each profile's
+    identifying field (see set_paused above), and `Manager.reload()` diffs folders
+    by it, so changing it here would look like removing one folder and adding an
+    unrelated one rather than editing settings on the same folder. To move a
+    folder to a different path, remove it and add it again instead."""
+    config_path = Path(config_path)
+    target = Path(match_value)
+    raw = yaml.safe_load(config_path.read_text()) or {}
+    for entry in raw.get("folders", []):
+        if entry.get("profile") == profile and Path(entry.get(match_key, "")) == target:
+            entry.update(updates)
+            break
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
