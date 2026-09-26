@@ -1,0 +1,45 @@
+# TIMELINE.md
+
+A short chronological log of what's been built and fixed on Sync Manager — read this first for "how far have we come," then go to `CLAUDE.md` for the technical detail behind any entry below.
+
+**Sources**: git commit history and this project's Claude Code session history (the only two that exist for this repo — it was built from an empty directory entirely in Claude Code, so there is no separate Codex or other-agent history to draw from here, despite that being a plausible source in general).
+
+**Event types**: `Milestone` (a build-order checkpoint reached), `Update` (something added outside the numbered build order), `Troubleshooting` (a bug found and fixed), `Decision` (a design choice made where the spec was ambiguous or silent).
+
+**Maintaining this file**: append a new entry under today's date heading (add one if it doesn't exist yet) whenever a milestone lands, a real bug is found and fixed, or a non-obvious decision gets made — one line, no more detail than below. Full rationale belongs in `CLAUDE.md`, not here.
+
+---
+
+## 2026-09-25
+
+- **[Milestone] Project bootstrap** — Repo was empty; `CLAUDE.md` created capturing the user's pasted design spec as the target architecture for a from-scratch build.
+- **[Decision] Hot Data supervises Syncthing, doesn't sync itself** — The app only watches, checksums, versions, and logs Hot Data folders; actual cross-machine file transport is left to Syncthing (or similar) running underneath.
+- **[Milestone] Milestone 1: core watcher + checksum** — `engine/watcher.py`, `checksum.py`, `logger.py`; verified live against a real test folder (create/modify/delete all logged with checksums).
+- **[Milestone] Milestone 2: Hot Data profile** — `profiles/hot_data.py` adds versioned rollback (last N copies) on top of the watcher.
+- **[Troubleshooting] Version pruning kept only 2 copies instead of 5** — A negative-index list-slicing bug in `_prune_versions` silently over-pruned; fixed and reverified live.
+- **[Milestone] Milestone 3: staging + atomic promote** — `engine/staging.py`; a directory swap via two renames, since a single `os.rename()` can't overwrite a non-empty directory.
+- **[Troubleshooting] Same-second repeat failures crashed the quarantine step** — `FileExistsError` from timestamp-collision naming; fixed with collision-safe naming (the same fix was also applied to the vault-swap's temporary backup path).
+- **[Decision] WeChat Vault config needs `staging_path` + `vault_path`, not one `path`** — The original planning notes' example assumed a single path; staging and vault are independent locations that can legitimately live on different disks.
+- **[Milestone] Milestone 4: SQLite integrity check + WeChat Vault profile** — Content-sniffed SQLite detection (not extension-based), `PRAGMA integrity_check`, and size/count-drop and truncation checks against the last known-good vault.
+- **[Troubleshooting] A corrupted SQLite header was silently skipped instead of flagged** — Header-sniffing stopped recognizing a header-corrupted file as a database at all; fixed by cross-checking against the last known-good vault.
+- **[Milestone] Milestone 5: config loading + hot-reload** — `engine/config.py` + `folders.yaml` drive a multi-folder `Manager`; folders addable/removable live without restarting the app.
+- **[Milestone] Milestone 6: Flask status dashboard** — A live status table for every managed folder.
+- **[Troubleshooting] Long paths pushed the Status column off-screen** — Fixed with `table-layout: fixed` + `box-sizing: border-box`.
+- **[Troubleshooting] Flask wasn't picking up template edits while the app was running** — `TEMPLATES_AUTO_RELOAD` is off by default; enabled explicitly.
+- **[Milestone] Milestone 7: folder picker** — `/add` + `/browse` routes, no JavaScript; form state is carried across browsing via query parameters.
+- **[Troubleshooting] A bad configured path could crash the whole config reload** — `watchdog` raises immediately when asked to watch a nonexistent path; now caught per-folder so one bad entry doesn't take down hot-reload for every other folder.
+- **[Milestone] Milestone 8: manual Pause/Resume/Promote controls** — Dashboard buttons for Hot Data pause/resume and WeChat Vault promote-now.
+- **[Troubleshooting] The new Actions column reintroduced the Milestone 6 overflow bug** — A too-narrow Profile column broke single words onto individual letters; fixed again with a stricter `nowrap` rule.
+- **[Milestone] Milestone 9: persistent logging + failure alerting** — A rotating log file, plus a pluggable ntfy/webhook-style alert on integrity failure.
+- **[Update] Full v1 committed to git** — First commit (`5ce3dea`), 21 files: all 9 build-order milestones.
+
+## 2026-09-26
+
+- **[Update] Automatic scheduling added for WeChat Vault** — `engine/scheduler.py` (APScheduler); `promote_interval_minutes` is now actually acted on, not just parsed and ignored.
+- **[Troubleshooting] Reload would have reset every promotion timer on any unrelated config edit** — Confirmed empirically that rescheduling a job resets its countdown even with identical settings; config-diffing was added before this could ship, not discovered after.
+- **[Troubleshooting] Automatic retries would have alerted on every single failed attempt, forever** — Added per-vault alert deduplication so a stuck folder alerts once per distinct failure and only alerts again after a recovery or a genuinely new problem.
+- **[Update] `CLAUDE.md` Handover section + this file added** — A concise orientation layer for picking the project up cold, and this chronological log.
+- **[Update] Real Pause/Resume added for WeChat Vault** — Unschedules the automatic job without losing the folder's config; manual "Promote now" still works while paused.
+- **[Troubleshooting] Pausing WeChat Vault silently broke manual "Promote now"** — The first version dropped the profile object on pause (mirroring Hot Data), but the promote route looks it up in that same dict — so a manual click while paused did nothing at all, with no error. Found by testing the exact claim the docs made rather than trusting it. Fixed by keeping the profile alive across pause (it holds no thread, unlike Hot Data's watcher) and only unscheduling the job.
+- **[Update] pytest suite added** — `tests/` (73 tests, one module per engine/profile/web file, plus `test_manager.py` for `main.py`'s `Manager`), built retroactively from every adversarial scenario that had only lived in throwaway scripts up to this point.
+- **[Troubleshooting] A WeChat Vault folder added directly as `paused: true` got no profile at all** — `Manager.reload()` skipped profile *creation*, not just scheduling, for any paused folder — fine for a folder pausing after already running, broken for one that starts paused (manual "Promote now" had nothing to call: `KeyError`/silent no-op). Found while writing `test_manual_promote_still_works_while_paused`, not by manual testing. Fixed by decoupling "does the profile need (re)building" from "does the schedule need touching" — which also means pause/resume on an already-running folder now preserves its promotion history instead of resetting it, an unplanned improvement over what shipped a few hours earlier.

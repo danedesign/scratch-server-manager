@@ -95,12 +95,22 @@ def create_app(manager) -> Flask:
 
     @app.route("/folders/hot_data/pause", methods=["POST"])
     def pause_hot_data():
-        set_paused(manager.config_path, request.form.get("path", ""), True)
+        set_paused(manager.config_path, "hot_data", "path", request.form.get("path", ""), True)
         return redirect(url_for("status"))
 
     @app.route("/folders/hot_data/resume", methods=["POST"])
     def resume_hot_data():
-        set_paused(manager.config_path, request.form.get("path", ""), False)
+        set_paused(manager.config_path, "hot_data", "path", request.form.get("path", ""), False)
+        return redirect(url_for("status"))
+
+    @app.route("/folders/wechat_vault/pause", methods=["POST"])
+    def pause_wechat_vault():
+        set_paused(manager.config_path, "wechat_vault", "staging_path", request.form.get("staging_path", ""), True)
+        return redirect(url_for("status"))
+
+    @app.route("/folders/wechat_vault/resume", methods=["POST"])
+    def resume_wechat_vault():
+        set_paused(manager.config_path, "wechat_vault", "staging_path", request.form.get("staging_path", ""), False)
         return redirect(url_for("status"))
 
     @app.route("/folders/wechat_vault/promote", methods=["POST"])

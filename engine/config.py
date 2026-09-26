@@ -23,6 +23,7 @@ class WeChatVaultFolderConfig:
     vault_path: Path
     promote_interval_minutes: int = 60
     keep_failed_staging: bool = True
+    paused: bool = False
 
 
 FolderConfig = Union[HotDataFolderConfig, WeChatVaultFolderConfig]
@@ -32,7 +33,7 @@ FolderConfig = Union[HotDataFolderConfig, WeChatVaultFolderConfig]
 # other the way Hot Data derives its sibling `.versions` dir would be guessing.
 KNOWN_KEYS = {
     "hot_data": {"path", "version_dir", "versions_to_keep", "paused"},
-    "wechat_vault": {"staging_path", "vault_path", "promote_interval_minutes", "keep_failed_staging"},
+    "wechat_vault": {"staging_path", "vault_path", "promote_interval_minutes", "keep_failed_staging", "paused"},
 }
 
 
@@ -66,6 +67,7 @@ def load_config(config_path: Path) -> list[FolderConfig]:
                     vault_path=Path(entry["vault_path"]),
                     promote_interval_minutes=entry.get("promote_interval_minutes", 60),
                     keep_failed_staging=entry.get("keep_failed_staging", True),
+                    paused=entry.get("paused", False),
                 ))
         except KeyError as exc:
             logger.warning("Skipping folder entry missing required key %s: %s", exc, entry)
@@ -84,15 +86,16 @@ def append_folder(config_path: Path, entry: dict) -> None:
     config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
 
 
-def set_paused(config_path: Path, hot_data_path: str, paused: bool) -> None:
-    """Flips `paused` on the hot_data entry matching this path. Compares via Path,
-    not the raw string, since the YAML may use forward slashes while a path built
-    from a live Config object renders with the OS's own separator."""
+def set_paused(config_path: Path, profile: str, match_key: str, match_value: str, paused: bool) -> None:
+    """Flips `paused` on the entry matching `profile` and `match_key` (`"path"` for
+    hot_data, `"staging_path"` for wechat_vault). Compares via Path, not the raw
+    string, since the YAML may use forward slashes while a path built from a live
+    Config object renders with the OS's own separator."""
     config_path = Path(config_path)
-    target = Path(hot_data_path)
+    target = Path(match_value)
     raw = yaml.safe_load(config_path.read_text()) or {}
     for entry in raw.get("folders", []):
-        if entry.get("profile") == "hot_data" and Path(entry.get("path", "")) == target:
+        if entry.get("profile") == profile and Path(entry.get(match_key, "")) == target:
             entry["paused"] = paused
             break
     config_path.write_text(yaml.safe_dump(raw, sort_keys=False))

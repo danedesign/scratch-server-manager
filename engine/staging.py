@@ -14,6 +14,12 @@ IntegrityCheck = Callable[[Path], IntegrityResult]
 
 logger = get_logger()
 
+# Tracks the last reason a given vault was alerted for, so a folder that's stuck
+# failing (e.g. retried hourly by engine/scheduler.py) alerts once per distinct
+# failure, not once per retry forever. Cleared on the next successful promotion,
+# so a problem that recurs later - even with the same reason - alerts again.
+_last_alert_reason: dict[Path, str] = {}
+
 
 @dataclass
 class PromotionResult:
@@ -39,9 +45,14 @@ def promote(
             quarantine = _quarantine_path(staging_path)
             shutil.copytree(staging_path, quarantine)
             logger.warning("Failed staging copy preserved at %s for inspection", quarantine)
-        send_alert(f"Promotion skipped for {vault_path}: {result.reason}")
+        if _last_alert_reason.get(vault_path) != result.reason:
+            send_alert(f"Promotion skipped for {vault_path}: {result.reason}")
+            _last_alert_reason[vault_path] = result.reason
+        else:
+            logger.info("Suppressing repeat alert for %s (same failure reason as last alert)", vault_path)
         return PromotionResult(promoted=False, reason=result.reason)
 
+    _last_alert_reason.pop(vault_path, None)
     _check_single_writer(vault_path, machine_id)
     _atomic_replace_dir(staging_path, vault_path)
     _record_promotion(vault_path, machine_id)
