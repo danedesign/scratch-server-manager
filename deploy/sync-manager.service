@@ -1,0 +1,21 @@
+[Unit]
+Description=Sync Manager (Hot Data / WeChat Vault dashboard)
+After=network-online.target smbd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dane
+Group=dane
+WorkingDirectory=/home/dane/scratch-server-manager
+ExecStart=/home/dane/scratch-server-manager/.venv/bin/python main.py config/folders.yaml
+# main.py has no intentional exit path today (it blocks in app.run()) - so
+# Restart=always covers both a crash and a bug that lets it return, not
+# just non-zero exits.
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
