@@ -27,17 +27,17 @@ All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeCha
 - ✅ Dashboard UI for editing an existing folder's settings (`/folders/{hot_data,wechat_vault}/edit`) — verified live in a real browser, including the folder-browse picker round-trip
 - ✅ CI running the test suite automatically (`.github/workflows/tests.yml`) — runs `pytest` on every push/PR to `main`; verified with a real GitHub Actions run, not just the YAML being plausible: all 89 tests passed in 25s
 - ✅ **WeChat staging topology decided**: `staging_path` must be local disk on whichever machine is logged into WeChat, never a Samba/CIFS mount (the CIFS/SQLite locking finding from Samba testing made this a real requirement, not a style preference) — getting it onto the Debian host is left to something transport-level underneath (Syncthing, rsync, etc.), the same assumption Hot Data already makes. `vault_path` has no such restriction and was verified as a Samba mount, including across two real machines. Documented in `CLAUDE.md`'s Config format section; no code change needed since this app never writes SQLite itself.
+- ✅ **Syncthing status integration for Hot Data** (`engine/syncthing.py`, optional `syncthing_folder_id` per folder) — verified against a real Syncthing instance installed on the Debian VM, not a stub: dashboard correctly showed `syncthing: idle`, and a rescan after a real file write correctly updated the reflected state.
 
 ## Open items, priority-ranked by risk (not by effort)
 
 | # | Item | Status | Why it matters |
 |---|------|--------|-----------------|
-| 1 | Syncthing status integration for Hot Data | ⬜ Not started | Dashboard shows "watching," not real Syncthing sync state. |
-| 2 | Logout-event promotion trigger | ⬜ Not started, deliberately deferred | Platform-specific, no way to test it from this dev environment. |
+| 1 | Logout-event promotion trigger | ⬜ Not started, deliberately deferred | Platform-specific, no way to test it from this dev environment. |
 
 ## Recommended next step
 
-**#1 — Syncthing status integration for Hot Data** is the only remaining item with real build value; the logout trigger (#2) stays deliberately deferred as untestable from this dev environment. Query Syncthing's local REST API (it runs alongside this app, per the original design — see Hot Data, below) to surface real sync state on the dashboard instead of just "we saw a local change."
+Every build-order milestone and every requested post-v1 addition is now done and verified against the real Debian target. The only open item is the logout-event trigger (#1), deliberately deferred since it's platform-specific and untestable from this dev environment — pick it up only if/when a way to test it (or the user's actual OS logout behavior) becomes available. Otherwise this project is in a stable, fully-verified state; future work should come from new user requests rather than this list.
 
 ## Maintaining this file
 
