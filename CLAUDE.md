@@ -77,6 +77,8 @@ Keep profile-specific logic thin (`profiles/*.py`); anything reusable across pro
 
 ## Config format (`config/folders.yaml`, implemented: `engine/config.py`)
 
+**`config/folders.yaml` itself is gitignored, not tracked** — a real deployment's folder list is machine-specific and can contain real personal paths (e.g. a real WeChat data location), which shouldn't end up in version control. `config/folders.yaml.example` is the tracked, in-repo placeholder showing the format; copy it to `config/folders.yaml` (or just create the real one directly) on each deployment.
+
 ```yaml
 folders:
   - path: /srv/hotdata/documents
