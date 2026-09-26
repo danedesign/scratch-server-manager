@@ -7,3 +7,6 @@ venv/
 logs/
 .pytest_cache/
 config/folders.yaml
+desktop-app/build/
+desktop-app/dist/
+desktop-app/*.spec
