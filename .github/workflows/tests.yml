@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    # ubuntu-latest as the closest CI proxy for the real Debian deployment target -
+    # this also means test_set_paused_matches_despite_separator_style_windows (see
+    # tests/test_config.py) correctly skips here instead of running, matching the
+    # same POSIX-vs-Windows split confirmed on the real Debian VM.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements-dev.txt
+
+      # Excludes the `slow` marker (a real ~1-minute APScheduler wait) by default via
+      # pytest.ini's addopts - keeps CI fast; that test is still run manually and
+      # confirmed passing on real Debian (see CLAUDE.md's Testing section).
+      - run: pytest
