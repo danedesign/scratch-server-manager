@@ -5,6 +5,22 @@ from typing import Optional
 
 SQLITE_HEADER = b"SQLite format 3\x00"
 
+# Confirmed against a real WeChat Linux client (db_storage/{message,contact,session,...}),
+# not guessed: every .db/.kvdb file there is SQLCipher-encrypted - `file` reports "data"
+# for all of them, and the first bytes are high-entropy with no plaintext header, since
+# SQLCipher encrypts the header too. Content can't identify these as databases at all,
+# so - unlike the plain-SQLite path above - this is deliberately extension-based. Doesn't
+# match `.db-wal`/`.db-shm`/`.kvdb-wal`/`.kvdb-shm` companion files (their full suffix,
+# e.g. ".db-wal", isn't in this set) - those have a different internal structure (WAL
+# frames carry their own per-frame header) and page-alignment doesn't apply to them; they're
+# still covered by the generic size/count/truncation checks below, just not this one.
+ENCRYPTED_DB_EXTENSIONS = {".db", ".kvdb"}
+
+# SQLCipher's default page size. Configurable in principle, but this is what a real
+# WeChat client's files were observed to align to (908, 151, and 19 pages exactly, for
+# three different .db files of different sizes) - good enough for a corruption signal.
+SQLCIPHER_PAGE_SIZE = 4096
+
 
 @dataclass
 class IntegrityResult:
@@ -67,25 +83,54 @@ def _is_sqlite_file(path: Path) -> bool:
 
 
 def _check_sqlite_files(root: Path, last_good_path: Optional[Path] = None) -> list[str]:
-    """Runs PRAGMA integrity_check on every file that currently looks like SQLite.
-    Also catches the case a header-sniffing check would otherwise miss: a file that
-    WAS a valid SQLite database in last_good_path but no longer has a valid header in
+    """Runs PRAGMA integrity_check on every file that currently looks like plain
+    SQLite. Also catches the case header-sniffing alone would miss: a file that WAS
+    a valid SQLite database in last_good_path but no longer has a valid header in
     root (e.g. its header got corrupted/truncated) - that's flagged, not silently
-    treated as "not a database, nothing to check"."""
+    treated as "not a database, nothing to check". Files that were never plain
+    SQLite but match WeChat's real encrypted-database naming get a page-alignment
+    check instead - see ENCRYPTED_DB_EXTENSIONS for why PRAGMA can't run on them."""
     problems = []
     for path in root.rglob("*"):
         if not path.is_file():
             continue
         relative = path.relative_to(root)
+
         if _is_sqlite_file(path):
             ok, detail = _sqlite_integrity_check_file(path)
             if not ok:
                 problems.append(f"{relative}: {detail}")
-        elif last_good_path is not None:
+            continue
+
+        if last_good_path is not None:
             previous = last_good_path / relative
             if previous.is_file() and _is_sqlite_file(previous):
                 problems.append(f"{relative}: no longer has a valid SQLite header (was a database in the last known-good vault)")
+                continue
+
+        if path.suffix in ENCRYPTED_DB_EXTENSIONS:
+            ok, detail = _check_page_alignment(path)
+            if not ok:
+                problems.append(f"{relative}: {detail}")
+
     return problems
+
+
+def _check_page_alignment(path: Path, page_size: int = SQLCIPHER_PAGE_SIZE) -> tuple[bool, str]:
+    """Weaker than PRAGMA integrity_check, but works without the decryption key,
+    which this tool must never have or ask for. SQLCipher organizes data in
+    fixed-size pages, so a genuine encrypted database's file size is always an
+    exact multiple of the page size; a corrupted or truncated write landing
+    exactly on a page boundary by chance is very unlikely."""
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        return False, str(exc)
+    if size == 0:
+        return False, "zero-byte encrypted database file"
+    if size % page_size != 0:
+        return False, f"size {size} is not a multiple of the {page_size}-byte page size (possible truncation/corruption)"
+    return True, "page-aligned"
 
 
 def _sqlite_integrity_check_file(path: Path) -> tuple[bool, str]:
