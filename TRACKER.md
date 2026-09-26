@@ -15,6 +15,8 @@ Legend: ✅ done & verified · 🔶 partially done · ⬜ not started · 🚫 bl
 
 The real `wechat_vault` entry also has `syncthing_folder_id: wechat-staging` set, and `/etc/sync-manager.env` holds the real Syncthing API key (loaded via the unit's `EnvironmentFile=`) — the dashboard's single status row is now the complete picture: `ok — sqlite integrity ok, size/count within expected range (next auto-promote ...) (syncthing: idle) [verified ok @ ...]`. Nothing about this deployment requires opening Syncthing's own UI day-to-day. The user tested this directly: sent themselves an image over WeChat on the Windows PC, watched it sync, then a real click of the dashboard's new "Verify" button confirmed 0 bytes pending on Syncthing plus a clean integrity pass.
 
+Access no longer requires remembering a URL at all: the dashboard is installable as a PWA (a real app icon, no address bar), and `desktop-app/` builds a small native launcher that auto-discovers whichever tailnet device is running Sync Manager and opens straight to it — verified finding the real VM among 7 real tailnet devices, and the user confirmed the launched window showed the live dashboard.
+
 ## v1 scope (original 9 build-order milestones)
 
 All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeChat Vault (staged + SQLite-integrity-checked + atomically promoted), config loading with hot-reload, Flask dashboard, folder picker, manual controls, persistent logging + pluggable alerting.
@@ -35,6 +37,9 @@ All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeCha
 - ✅ **WeChat staging topology decided**: `staging_path` must be local disk on whichever machine is logged into WeChat, never a Samba/CIFS mount (the CIFS/SQLite locking finding from Samba testing made this a real requirement, not a style preference) — getting it onto the Debian host is left to something transport-level underneath (Syncthing, rsync, etc.), the same assumption Hot Data already makes. `vault_path` has no such restriction and was verified as a Samba mount, including across two real machines. Documented in `CLAUDE.md`'s Config format section; no code change needed since this app never writes SQLite itself.
 - ✅ **Syncthing status integration for Hot Data** (`engine/syncthing.py`, optional `syncthing_folder_id` per folder) — verified against a real Syncthing instance installed on the Debian VM, not a stub: dashboard correctly showed `syncthing: idle`, and a rescan after a real file write correctly updated the reflected state.
 - ✅ `config/folders.yaml` untracked from git (a real deployment's folder list can contain real personal paths) — `config/folders.yaml.example` is the tracked placeholder now
+- ✅ WeChat Vault Syncthing status integration and a one-click "Verify" action, both live in production — see the Live deployment status section above
+- ✅ Dashboard installable as a PWA (`web/static/manifest.json` + `sw.js`) — a real app icon, no address bar
+- ✅ **Native desktop launcher (`desktop-app/`) that auto-discovers Sync Manager on the tailnet** — no URL to remember at all. Built with `pywebview` instead of Tauri (Tauri would have needed the MSVC C++ Build Tools, not installed on this dev machine) — shells out to `tailscale status --json`, probes every device's manifest concurrently, caches the match. Verified finding the real VM among 7 real tailnet devices and launching the real dashboard.
 
 ## Open items, priority-ranked by risk (not by effort)
 

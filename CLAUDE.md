@@ -67,15 +67,23 @@ sync-manager/
 │   ├── config.py         # folders.yaml parsing + per-profile validation
 │   ├── alerting.py       # pluggable failure notification (ntfy/webhook-style POST)
 │   ├── scheduler.py      # APScheduler wrapper - interval-based WeChat Vault promotion
+│   ├── syncthing.py      # queries Syncthing's own REST API for real sync state
 │   └── logger.py         # structured logs to stdout + logs/sync-manager.log
 ├── profiles/
 │   ├── hot_data.py       # continuous sync, basic checksum verification
 │   └── wechat_vault.py   # staged sync, SQLite integrity check, single-writer aware
 ├── config/
-│   └── folders.yaml      # user-assigned folder → profile mapping
+│   ├── folders.yaml         # gitignored - real deployment's folder list, real personal paths
+│   └── folders.yaml.example # tracked placeholder showing the format
 ├── web/
-│   ├── app.py             # Flask dashboard: status view, folder picker, pause/resume/promote controls
-│   └── templates/         # status.html, add.html, browse.html
+│   ├── app.py             # Flask dashboard: status view, folder picker, pause/resume/promote/verify controls
+│   ├── templates/         # status.html, add.html, browse.html, edit_*.html
+│   └── static/            # PWA manifest.json, sw.js, icons/ - see Web dashboard, below
+├── desktop-app/             # native launcher: auto-discovers Sync Manager on the tailnet - see Web dashboard, below
+│   ├── launcher.py
+│   └── requirements.txt     # separate from the server's own - a GUI dep has no business there
+├── deploy/
+│   └── sync-manager.service # systemd unit - see Persistent deployment, below
 ├── tests/                  # pytest - see Testing, below
 ├── main.py                 # entrypoint: loads config, runs Manager (profiles + config hot-reload) + Flask dashboard
 ├── requirements.txt         # runtime deps only
@@ -177,6 +185,16 @@ folders:
   **Deliberately not built**: a fully independent cross-machine hash recompute — a script running on the Windows PC itself that computes its own SHA256 manifest without trusting Syncthing's internal hashing at all, compared against an independently-computed staging manifest. This would be a strictly stronger guarantee, but needs new scheduled infrastructure on the WeChat machine (a script + a Windows Task Scheduler entry) for a fairly small marginal gain over what Syncthing's own block-hash verification already provides — the user was offered this as an explicit tradeoff and chose the zero-new-infrastructure version instead. Revisit this only if Syncthing's own verification is ever specifically suspected of being wrong, not as a routine upgrade.
 
   Verified live against real production data: SSH'd in and POSTed to the real `/folders/wechat_vault/verify` route for `/home/dane/wechat-staging` (which by then held the user's real synced WeChat data, including a test image they'd just sent themselves), confirmed `[verified ok @ ...]` appeared on the dashboard row — and separately, in a local browser session, clicked the actual "Verify" button and confirmed the Actions column (now four buttons per WeChat Vault row: Edit, Promote now, Verify, Pause) still renders without reintroducing the Milestone-6/8 overflow bug.
+
+- **Installable as a PWA (post-v1)**: `web/static/manifest.json` + `web/static/sw.js`, linked from `status.html`. The service worker is deliberately network-only (`event.respondWith(fetch(event.request))`, no caching at all) — this page's entire value is live status, so a cached/stale response would be actively misleading, unlike a typical PWA's offline-first caching. Icons (`web/static/icons/icon-{192,512}.png`) are generated flat PNGs (a plain zlib/struct-based PNG encoder, no Pillow dependency added) matching the dashboard's own dark/blue theme. Flask's default static-file serving already covers `/static/` for the `web` package (`Flask(__name__)`'s `root_path` resolves to the package directory), so no `create_app()` changes were needed. Lets a user "Install" the dashboard from their browser as a real app icon (Start Menu/Desktop/phone home screen) instead of remembering a URL. Server-side correctness (manifest served, correct JSON, correct content-types, icons valid PNGs) is covered by `tests/test_web.py`; actual browser-side installability (the install prompt, service worker activation) could not be fully verified from this session's own sandboxed browser pane, which restricts Service Worker registration — confirmed via `fetch()` that the script itself is served correctly and standards-compliant, but a real install should be confirmed in an actual desktop browser.
+
+- **Native desktop launcher (`desktop-app/`, post-v1)**: after the PWA, the user asked for something more — a lightweight native app (Tauri/Electron-style) that scans the tailnet itself to find the right device, no URL involved at all. Built with `pywebview` (a thin WebView2 wrapper, not Chromium-bundling like Electron) instead of Tauri: checking this dev machine's toolchain first found Rust/Cargo present but not the MSVC C++ Build Tools (`cl.exe`) Tauri's Rust backend needs to compile on Windows — installing those is a multi-GB, admin-rights download, and the user chose the zero-new-toolchain path when offered the tradeoff directly.
+  - `desktop-app/launcher.py`: on launch, shells out to `tailscale status --json` (the Tailscale CLI, already on `PATH` since Tailscale itself is installed) to enumerate every device on the tailnet (`Self` + `Peer` map, IPv4 `TailscaleIPs` only, online devices only), then probes each one's `:8420/static/manifest.json` concurrently (`ThreadPoolExecutor`) with a 1.5s timeout, looking for the one whose manifest's `name` matches `"Sync Manager"` — this reuses the exact manifest the PWA work just added, rather than inventing a second identification mechanism. First match found gets cached to `~/.sync_manager_launcher.json`; the next launch tries that cached IP first (a single fast probe) before falling back to a full re-scan, so normal startup is near-instant and only a real topology change (a different device now serving the dashboard) triggers a fresh scan.
+  - Deliberately does not duplicate the dashboard's UI: the native window shows a loading spinner during discovery, then `window.load_url()`s straight to the real dashboard once found — a thin shell, not a reimplementation.
+  - Packages to a single `.exe` via PyInstaller (`--onefile --windowed --icon icon.ico`) — no installer, copy the file anywhere. `icon.ico` was generated the same way as the PWA's PNGs (a small pure-Python PNG-in-ICO wrapper, no Pillow), reusing the same visual design.
+  - Windows-only as built (one `subprocess.CREATE_NO_WINDOW` flag, gated on `sys.platform == "win32"`, suppresses a console flash when shelling out to `tailscale.exe` from a windowed/no-console build) — `pywebview` itself is cross-platform, so supporting macOS/Linux later would only mean making that one flag conditional, not a rewrite.
+  - Kept as its own `desktop-app/requirements.txt` and virtualenv, separate from the server's — a desktop GUI dependency (`pywebview`) has no business in the Flask app's own `requirements.txt`.
+  - **Verified live, not just read for plausibility**: ran discovery standalone first (`launcher._candidate_ips()` / `launcher.discover()`) and confirmed it correctly picked the real Debian VM (`100.115.118.107`) out of 7 real devices on the user's actual tailnet purely by probing, not by any hardcoded address; confirmed the cache path took 37ms on a second call instead of a full scan; then actually launched `launcher.py` for real and the user confirmed the resulting native window showed the live dashboard.
 
 ## Alerting (implemented: `engine/alerting.py`)
 - **Notification**: `send_alert(message)` POSTs the raw message body to the URL in the `SYNC_MANAGER_NTFY_URL` env var — the shape ntfy.sh (and many plain webhook receivers) expect. No env var set → logs "not sent" and returns; never raises, so a bad or unreachable alert endpoint can't take down a promotion attempt (verified by pointing it at a refused connection and confirming `promote()` still returns normally). There's no global settings file yet, so an env var is the simplest place for one deployment-wide value — introduce a real global-config mechanism only if a second such setting shows up. A JSON-payload sink (Slack/Discord-style incoming webhooks want `{"text": ...}`, not a raw body) is the natural next pluggable option but wasn't built, since nothing in this project needs it yet. Email is explicitly a later option per the original notes.
