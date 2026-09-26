@@ -15,6 +15,7 @@ class HotDataFolderConfig:
     version_dir: Optional[Path] = None
     versions_to_keep: int = 5
     paused: bool = False
+    syncthing_folder_id: Optional[str] = None
 
 
 @dataclass
@@ -32,7 +33,7 @@ FolderConfig = Union[HotDataFolderConfig, WeChatVaultFolderConfig]
 # because the two can legitimately live on different disks/trees - deriving one from the
 # other the way Hot Data derives its sibling `.versions` dir would be guessing.
 KNOWN_KEYS = {
-    "hot_data": {"path", "version_dir", "versions_to_keep", "paused"},
+    "hot_data": {"path", "version_dir", "versions_to_keep", "paused", "syncthing_folder_id"},
     "wechat_vault": {"staging_path", "vault_path", "promote_interval_minutes", "keep_failed_staging", "paused"},
 }
 
@@ -60,6 +61,7 @@ def load_config(config_path: Path) -> list[FolderConfig]:
                     version_dir=Path(entry["version_dir"]) if "version_dir" in entry else None,
                     versions_to_keep=entry.get("versions_to_keep", 5),
                     paused=entry.get("paused", False),
+                    syncthing_folder_id=entry.get("syncthing_folder_id"),
                 ))
             else:
                 configs.append(WeChatVaultFolderConfig(

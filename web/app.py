@@ -33,6 +33,7 @@ def create_app(manager) -> Flask:
             "add.html",
             path=request.args.get("path", ""),
             versions_to_keep=request.args.get("versions_to_keep", "5"),
+            syncthing_folder_id=request.args.get("syncthing_folder_id", ""),
             staging_path=request.args.get("staging_path", ""),
             vault_path=request.args.get("vault_path", ""),
             promote_interval_minutes=request.args.get("promote_interval_minutes", "60"),
@@ -43,23 +44,33 @@ def create_app(manager) -> Flask:
     def add_hot_data():
         path = request.form.get("path", "").strip()
         versions_raw = request.form.get("versions_to_keep", "5").strip()
+        syncthing_folder_id = request.form.get("syncthing_folder_id", "").strip()
+
+        def back(error: str):
+            return redirect(url_for(
+                "add_folder_form", error=error, path=path,
+                versions_to_keep=versions_raw, syncthing_folder_id=syncthing_folder_id,
+            ))
 
         if not path:
-            return redirect(url_for("add_folder_form", error="Path is required", versions_to_keep=versions_raw))
+            return back("Path is required")
         if not Path(path).is_dir():
-            return redirect(url_for("add_folder_form", error=f"{path} is not an existing directory", path=path, versions_to_keep=versions_raw))
+            return back(f"{path} is not an existing directory")
         try:
             versions_to_keep = int(versions_raw)
             if versions_to_keep < 1:
                 raise ValueError
         except ValueError:
-            return redirect(url_for("add_folder_form", error="Versions to keep must be a positive integer", path=path, versions_to_keep=versions_raw))
+            return back("Versions to keep must be a positive integer")
 
-        append_folder(manager.config_path, {
+        entry = {
             "profile": "hot_data",
             "path": path,
             "versions_to_keep": versions_to_keep,
-        })
+        }
+        if syncthing_folder_id:
+            entry["syncthing_folder_id"] = syncthing_folder_id
+        append_folder(manager.config_path, entry)
         return redirect(url_for("status"))
 
     @app.route("/add/wechat_vault", methods=["POST"])
@@ -113,6 +124,7 @@ def create_app(manager) -> Flask:
             "edit_hot_data.html",
             path=str(cfg.path),
             versions_to_keep=request.args.get("versions_to_keep", str(cfg.versions_to_keep)),
+            syncthing_folder_id=request.args.get("syncthing_folder_id", cfg.syncthing_folder_id or ""),
             error=request.args.get("error", ""),
         )
 
@@ -120,9 +132,13 @@ def create_app(manager) -> Flask:
     def edit_hot_data():
         path = request.form.get("path", "").strip()
         versions_raw = request.form.get("versions_to_keep", "").strip()
+        syncthing_folder_id = request.form.get("syncthing_folder_id", "").strip()
 
         def back(error: str):
-            return redirect(url_for("edit_hot_data_form", error=error, path=path, versions_to_keep=versions_raw))
+            return redirect(url_for(
+                "edit_hot_data_form", error=error, path=path,
+                versions_to_keep=versions_raw, syncthing_folder_id=syncthing_folder_id,
+            ))
 
         try:
             versions_to_keep = int(versions_raw)
@@ -131,7 +147,10 @@ def create_app(manager) -> Flask:
         except ValueError:
             return back("Versions to keep must be a positive integer")
 
-        update_folder(manager.config_path, "hot_data", "path", path, {"versions_to_keep": versions_to_keep})
+        update_folder(manager.config_path, "hot_data", "path", path, {
+            "versions_to_keep": versions_to_keep,
+            "syncthing_folder_id": syncthing_folder_id or None,
+        })
         return redirect(url_for("status"))
 
     @app.route("/folders/wechat_vault/edit")

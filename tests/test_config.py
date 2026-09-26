@@ -117,6 +117,20 @@ folders:
     assert configs[0].paused is True
 
 
+def test_syncthing_folder_id_is_optional(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, "folders:\n- profile: hot_data\n  path: /a\n")
+    configs = load_config(cfg_path)
+    assert configs[0].syncthing_folder_id is None
+
+
+def test_syncthing_folder_id_parses_when_present(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, "folders:\n- profile: hot_data\n  path: /a\n  syncthing_folder_id: abcde-fghij\n")
+    configs = load_config(cfg_path)
+    assert configs[0].syncthing_folder_id == "abcde-fghij"
+
+
 def test_update_folder_hot_data(tmp_path):
     cfg_path = tmp_path / "folders.yaml"
     write(cfg_path, "folders:\n- profile: hot_data\n  path: /srv/hotdata/documents\n  versions_to_keep: 5\n")

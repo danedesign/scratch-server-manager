@@ -7,6 +7,7 @@ from typing import Optional
 from engine.config import HotDataFolderConfig, WeChatVaultFolderConfig, load_config
 from engine.logger import get_logger
 from engine.scheduler import PromotionScheduler
+from engine.syncthing import get_folder_status, summarize_status
 from engine.watcher import FolderWatcher
 from profiles.hot_data import HotDataProfile
 from profiles.wechat_vault import WeChatVaultProfile
@@ -178,6 +179,12 @@ class Manager:
             else:
                 last_event_at, last_event_type = self._hot_data_last_known.get(path, (None, None))
                 status_label, reason = "paused", "paused"
+
+            if cfg.syncthing_folder_id:
+                syncthing_status = get_folder_status(cfg.syncthing_folder_id)
+                if syncthing_status is not None:
+                    reason = f"{reason} ({summarize_status(syncthing_status)})"
+
             rows.append(FolderStatus(
                 profile="hot_data",
                 path=str(path),

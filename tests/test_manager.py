@@ -156,6 +156,38 @@ def wechat_config(staging, vault, **extra):
     return "\n".join(lines) + "\n"
 
 
+def test_hot_data_status_includes_syncthing_summary_when_configured(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    write_config(cfg_path, f"""
+folders:
+  - path: {watched.as_posix()}
+    profile: hot_data
+    syncthing_folder_id: abcde-fghij
+""")
+    m.reload()
+
+    monkeypatch.setattr(
+        "main.get_folder_status",
+        lambda folder_id: {"state": "syncing", "needFiles": 2} if folder_id == "abcde-fghij" else None,
+    )
+    row = m.status()[0]
+    assert "syncthing: syncing (2 file(s) remaining)" in row.reason
+
+
+def test_hot_data_status_unaffected_when_syncthing_unconfigured(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    watched = tmp_path / "hotfolder"
+    watched.mkdir()
+    write_config(cfg_path, f"folders:\n- path: {watched.as_posix()}\n  profile: hot_data\n")
+    m.reload()
+
+    monkeypatch.setattr("main.get_folder_status", lambda folder_id: pytest.fail("should not be called"))
+    row = m.status()[0]
+    assert "syncthing" not in row.reason
+
+
 def make_vault_folders(tmp_path):
     staging = tmp_path / "staging"
     vault = tmp_path / "vault"
