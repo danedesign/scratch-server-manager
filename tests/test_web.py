@@ -28,6 +28,31 @@ def test_status_page_empty(client):
     assert b"No folders configured" in resp.data
 
 
+def test_status_page_links_pwa_manifest(client):
+    resp = client.get("/")
+    assert b'rel="manifest" href="/static/manifest.json"' in resp.data
+
+
+def test_pwa_manifest_served(client):
+    resp = client.get("/static/manifest.json")
+    assert resp.status_code == 200
+    assert resp.json["name"] == "Sync Manager"
+    assert resp.json["display"] == "standalone"
+
+
+def test_pwa_service_worker_served(client):
+    resp = client.get("/static/sw.js")
+    assert resp.status_code == 200
+    assert b"fetch" in resp.data
+
+
+def test_pwa_icons_served(client):
+    for size in ("192", "512"):
+        resp = client.get(f"/static/icons/icon-{size}.png")
+        assert resp.status_code == 200
+        assert resp.data[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def test_status_page_lists_configured_folder(client, tmp_path):
     watched = tmp_path / "hotfolder"
     watched.mkdir()
