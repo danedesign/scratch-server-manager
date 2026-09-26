@@ -9,6 +9,10 @@ Legend: ✅ done & verified · 🔶 partially done · ⬜ not started · 🚫 bl
 
 ---
 
+## Live deployment status
+
+**In real use as of 2026-09-27**, not just verified against test fixtures. `sync-manager.service` and `syncthing@dane` both run as persistent systemd services on the Debian VM. A real WeChat client on a Windows 11 PC (`C:\Users\DL-Work\Documents\xwechat_files`) is paired via Syncthing (PC: Send Only → VM `staging_path` `/home/dane/wechat-staging`: Receive Only, enforced one-way in both directions so staging can never write back to the live WeChat client) to the VM's `wechat_vault` profile, auto-promoting every 30 minutes into the Samba-shared vault at `/srv/samba/wechat-vault/vaultdata`. First real promotion: 318 synced files, integrity check passed, 319 files confirmed in the vault afterward. `config/folders.yaml` on the VM now holds this real entry and is gitignored (see Post-v1 additions) rather than the placeholder that used to be tracked in git.
+
 ## v1 scope (original 9 build-order milestones)
 
 All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeChat Vault (staged + SQLite-integrity-checked + atomically promoted), config loading with hot-reload, Flask dashboard, folder picker, manual controls, persistent logging + pluggable alerting.
@@ -28,6 +32,7 @@ All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeCha
 - ✅ CI running the test suite automatically (`.github/workflows/tests.yml`) — runs `pytest` on every push/PR to `main`; verified with a real GitHub Actions run, not just the YAML being plausible: all 89 tests passed in 25s
 - ✅ **WeChat staging topology decided**: `staging_path` must be local disk on whichever machine is logged into WeChat, never a Samba/CIFS mount (the CIFS/SQLite locking finding from Samba testing made this a real requirement, not a style preference) — getting it onto the Debian host is left to something transport-level underneath (Syncthing, rsync, etc.), the same assumption Hot Data already makes. `vault_path` has no such restriction and was verified as a Samba mount, including across two real machines. Documented in `CLAUDE.md`'s Config format section; no code change needed since this app never writes SQLite itself.
 - ✅ **Syncthing status integration for Hot Data** (`engine/syncthing.py`, optional `syncthing_folder_id` per folder) — verified against a real Syncthing instance installed on the Debian VM, not a stub: dashboard correctly showed `syncthing: idle`, and a rescan after a real file write correctly updated the reflected state.
+- ✅ `config/folders.yaml` untracked from git (a real deployment's folder list can contain real personal paths) — `config/folders.yaml.example` is the tracked placeholder now
 
 ## Open items, priority-ranked by risk (not by effort)
 
