@@ -20,23 +20,23 @@ All ✅ done. Core watcher/checksum engine, Hot Data (versioned rollback), WeCha
 - ✅ `pytest` suite — 75 tests, all passing on Windows *and* real Debian
 - ✅ Hot Data live settings-editing (no restart needed)
 - ✅ **Verified end-to-end on real Debian 13**, over real Tailscale — including WeChat Vault's atomic promotion actually executed on real ext4 through the live dashboard, with the resulting database confirmed byte-for-byte intact
+- ✅ **Real WeChat data checked and handled — confirmed encrypted (SQLCipher), integrity checker updated and verified against it.** Every `.db`/`.kvdb` file in a real WeChat Linux client vault (`db_storage/{message,contact,session,...}`) is SQLCipher-encrypted — `file` reports "data" for all of them, no plaintext header, first bytes high-entropy. The checker previously detected zero of these as databases to check at all. Deliberately does **not** attempt decryption (this tool must never have or ask for the key) — instead added a page-alignment check (SQLCipher's fixed 4096-byte pages mean a genuine file size is always an exact multiple of that) for files matching the now-*confirmed* (not guessed) real naming. Verified directly against the real vault: passes clean on the real, healthy data; correctly flags a 17-byte truncation deliberately made to a scratch *copy* (never the live vault).
 
 ## Open items, priority-ranked by risk (not by effort)
 
 | # | Item | Status | Why it matters |
 |---|------|--------|-----------------|
-| 1 | Real WeChat databases: encrypted (SQLCipher) or plain SQLite? | 🚫 **Unknown — check this first** | If encrypted, the integrity checker's header-sniffing detects nothing at all, silently. The core safety feature could be doing zero real work right now and nothing would say so. |
-| 2 | Samba share testing | ⬜ Not started | The spec's whole framing is "Samba serves these shares, this app manages what's inside them" — never tested against an actual Samba mount (locking, permissions, behavior under Samba specifically). |
-| 3 | Persistent deployment (systemd unit, restart-on-crash, start-on-boot) | ⬜ Not started | Right now it only runs as long as a manual SSH session keeps it alive. |
-| 4 | Two real machines promoting to the same vault | ⬜ Not started | The single-writer sanity check exists exactly for this scenario, which has never actually happened in testing — only ever one machine. |
-| 5 | Dashboard UI to edit an existing folder's settings | 🔶 Mechanism works, no UI | `Manager.reload()` picks up a settings change live; nothing in `web/` writes anything except `paused` to an existing entry. Hand-edit `folders.yaml` today. |
-| 6 | Syncthing status integration for Hot Data | ⬜ Not started | Dashboard shows "watching," not real Syncthing sync state. |
-| 7 | Logout-event promotion trigger | ⬜ Not started, deliberately deferred | Platform-specific, no way to test it from this dev environment. |
-| 8 | CI running the test suite automatically | ⬜ Not started | Tests exist and pass; nothing runs them on push/PR yet. |
+| 1 | Samba share testing | ⬜ Not started | The spec's whole framing is "Samba serves these shares, this app manages what's inside them" — never tested against an actual Samba mount (locking, permissions, behavior under Samba specifically). |
+| 2 | Persistent deployment (systemd unit, restart-on-crash, start-on-boot) | ⬜ Not started | Right now it only runs as long as a manual SSH session keeps it alive. |
+| 3 | Two real machines promoting to the same vault | ⬜ Not started | The single-writer sanity check exists exactly for this scenario, which has never actually happened in testing — only ever one machine. |
+| 4 | Dashboard UI to edit an existing folder's settings | 🔶 Mechanism works, no UI | `Manager.reload()` picks up a settings change live; nothing in `web/` writes anything except `paused` to an existing entry. Hand-edit `folders.yaml` today. |
+| 5 | Syncthing status integration for Hot Data | ⬜ Not started | Dashboard shows "watching," not real Syncthing sync state. |
+| 6 | Logout-event promotion trigger | ⬜ Not started, deliberately deferred | Platform-specific, no way to test it from this dev environment. |
+| 7 | CI running the test suite automatically | ⬜ Not started | Tests exist and pass; nothing runs them on push/PR yet. |
 
 ## Recommended next step
 
-**#1 — check whether real WeChat data is encrypted**, before touching Samba or deployment. Cheap to check (`file /path/to/a/real/wechat/db`), and the answer determines whether the integrity checker needs real engineering work or already does its job. Building out #2/#3 first, only to find out afterward that #1 was broken the whole time, would be the expensive way to learn this.
+**#1 — Samba share testing.** Both profiles now have real-platform, real-data verification behind them; the next biggest unverified assumption is how either one behaves when the watched/staged folders are actual Samba mount points rather than plain local paths (file locking during a WeChat write-in-progress, permission mapping, whether the atomic rename swap still works the same way across a share). Persistent deployment (#2) is a natural follow-on once Samba's confirmed to work, since there's no point making it auto-start before knowing it works against the real share.
 
 ## Maintaining this file
 
