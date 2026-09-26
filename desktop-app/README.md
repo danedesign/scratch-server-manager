@@ -4,6 +4,8 @@ A tiny native window (WebView2 via `pywebview` — no Chromium bundling, no
 Electron) that finds whichever machine on your tailnet is running Sync
 Manager and opens its dashboard directly. No URL to remember or type.
 
+**Download the prebuilt `.exe`**: [latest release](https://github.com/danedesign/scratch-server-manager/releases/latest) — no build step needed, just download and double-click on any machine on the same tailnet.
+
 ## How discovery works
 
 1. Runs `tailscale status --json` (the Tailscale CLI, already installed
