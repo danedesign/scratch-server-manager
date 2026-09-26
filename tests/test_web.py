@@ -95,6 +95,24 @@ def test_add_wechat_vault_success(client, tmp_path):
     assert "wechat_vault" in raw and "45" in raw
 
 
+def test_add_wechat_vault_with_syncthing_folder_id(client, tmp_path):
+    staging = tmp_path / "staging"
+    vault = tmp_path / "vault"
+    staging.mkdir()
+    resp = client.post(
+        "/add/wechat_vault",
+        data={
+            "staging_path": str(staging),
+            "vault_path": str(vault),
+            "promote_interval_minutes": "45",
+            "syncthing_folder_id": "wechat-staging",
+        },
+    )
+    assert resp.status_code == 302
+    raw = client.cfg_path.read_text()
+    assert "wechat-staging" in raw
+
+
 def test_add_wechat_vault_rejects_same_staging_and_vault(client, tmp_path):
     staging = tmp_path / "staging"
     staging.mkdir()
@@ -211,6 +229,40 @@ def test_edit_wechat_vault_updates_settings(client, tmp_path):
     assert cfg.vault_path == new_vault
     assert cfg.promote_interval_minutes == 10
     assert cfg.keep_failed_staging is False  # checkbox omitted from posted data
+
+
+def test_edit_wechat_vault_form_prefills_syncthing_folder_id(client, tmp_path):
+    staging = tmp_path / "staging"
+    vault = tmp_path / "vault"
+    staging.mkdir()
+    client.cfg_path.write_text(
+        f"folders:\n- profile: wechat_vault\n  staging_path: {staging.as_posix()}\n"
+        f"  vault_path: {vault.as_posix()}\n  syncthing_folder_id: wechat-staging\n"
+    )
+    client.manager.reload()
+
+    resp = client.get(f"/folders/wechat_vault/edit?staging_path={staging}")
+    assert b"wechat-staging" in resp.data
+
+
+def test_edit_wechat_vault_updates_syncthing_folder_id(client, tmp_path):
+    staging = tmp_path / "staging"
+    vault = tmp_path / "vault"
+    staging.mkdir()
+    client.cfg_path.write_text(
+        f"folders:\n- profile: wechat_vault\n  staging_path: {staging.as_posix()}\n  vault_path: {vault.as_posix()}\n"
+    )
+    client.manager.reload()
+
+    resp = client.post("/folders/wechat_vault/edit", data={
+        "staging_path": str(staging),
+        "vault_path": str(vault),
+        "promote_interval_minutes": "60",
+        "syncthing_folder_id": "wechat-staging",
+    })
+    assert resp.status_code == 302
+    client.manager.reload()
+    assert client.manager._wechat_vault_configs[staging].syncthing_folder_id == "wechat-staging"
 
 
 def test_edit_wechat_vault_rejects_same_staging_and_vault(client, tmp_path):

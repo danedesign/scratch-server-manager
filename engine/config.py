@@ -25,6 +25,7 @@ class WeChatVaultFolderConfig:
     promote_interval_minutes: int = 60
     keep_failed_staging: bool = True
     paused: bool = False
+    syncthing_folder_id: Optional[str] = None
 
 
 FolderConfig = Union[HotDataFolderConfig, WeChatVaultFolderConfig]
@@ -34,7 +35,7 @@ FolderConfig = Union[HotDataFolderConfig, WeChatVaultFolderConfig]
 # other the way Hot Data derives its sibling `.versions` dir would be guessing.
 KNOWN_KEYS = {
     "hot_data": {"path", "version_dir", "versions_to_keep", "paused", "syncthing_folder_id"},
-    "wechat_vault": {"staging_path", "vault_path", "promote_interval_minutes", "keep_failed_staging", "paused"},
+    "wechat_vault": {"staging_path", "vault_path", "promote_interval_minutes", "keep_failed_staging", "paused", "syncthing_folder_id"},
 }
 
 
@@ -70,6 +71,7 @@ def load_config(config_path: Path) -> list[FolderConfig]:
                     promote_interval_minutes=entry.get("promote_interval_minutes", 60),
                     keep_failed_staging=entry.get("keep_failed_staging", True),
                     paused=entry.get("paused", False),
+                    syncthing_folder_id=entry.get("syncthing_folder_id"),
                 ))
         except KeyError as exc:
             logger.warning("Skipping folder entry missing required key %s: %s", exc, entry)

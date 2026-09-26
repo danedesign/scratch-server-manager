@@ -196,6 +196,37 @@ def make_vault_folders(tmp_path):
     return staging, vault
 
 
+def test_wechat_vault_status_includes_syncthing_summary_when_configured(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    write_config(cfg_path, f"""
+folders:
+  - profile: wechat_vault
+    staging_path: {staging.as_posix()}
+    vault_path: {vault.as_posix()}
+    syncthing_folder_id: wechat-staging
+""")
+    m.reload()
+
+    monkeypatch.setattr(
+        "main.get_folder_status",
+        lambda folder_id: {"state": "idle"} if folder_id == "wechat-staging" else None,
+    )
+    row = m.status()[0]
+    assert "syncthing: idle" in row.reason
+
+
+def test_wechat_vault_status_unaffected_when_syncthing_unconfigured(manager, tmp_path, monkeypatch):
+    m, cfg_path = manager
+    staging, vault = make_vault_folders(tmp_path)
+    write_config(cfg_path, wechat_config(staging, vault))
+    m.reload()
+
+    monkeypatch.setattr("main.get_folder_status", lambda folder_id: pytest.fail("should not be called"))
+    row = m.status()[0]
+    assert "syncthing" not in row.reason
+
+
 def test_wechat_vault_add_schedules_a_job(manager, tmp_path):
     m, cfg_path = manager
     staging, vault = make_vault_folders(tmp_path)

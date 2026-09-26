@@ -30,7 +30,7 @@
       <label for="hd-path">Folder to watch</label>
       <div class="path-row">
         <input type="text" id="hd-path" name="path" value="{{ path }}" placeholder="/srv/hotdata/documents">
-        <a class="browse-link" href="{{ url_for('browse', target='path', versions_to_keep=versions_to_keep) }}">Browse&hellip;</a>
+        <a class="browse-link" href="{{ url_for('browse', target='path', versions_to_keep=versions_to_keep, syncthing_folder_id=syncthing_folder_id) }}">Browse&hellip;</a>
       </div>
       <label for="hd-versions">Versions to keep</label>
       <input type="number" id="hd-versions" name="versions_to_keep" value="{{ versions_to_keep }}" min="1">
@@ -46,12 +46,12 @@
       <label for="wv-staging">Staging path (what the active machine's WeChat client writes to)</label>
       <div class="path-row">
         <input type="text" id="wv-staging" name="staging_path" value="{{ staging_path }}" placeholder="/srv/wechat/staging">
-        <a class="browse-link" href="{{ url_for('browse', target='staging_path', vault_path=vault_path, promote_interval_minutes=promote_interval_minutes) }}">Browse&hellip;</a>
+        <a class="browse-link" href="{{ url_for('browse', target='staging_path', vault_path=vault_path, promote_interval_minutes=promote_interval_minutes, wv_syncthing_folder_id=wv_syncthing_folder_id) }}">Browse&hellip;</a>
       </div>
       <label for="wv-vault">Vault path (the shared, promoted copy)</label>
       <div class="path-row">
         <input type="text" id="wv-vault" name="vault_path" value="{{ vault_path }}" placeholder="/srv/vault/wechat">
-        <a class="browse-link" href="{{ url_for('browse', target='vault_path', staging_path=staging_path, promote_interval_minutes=promote_interval_minutes) }}">Browse&hellip;</a>
+        <a class="browse-link" href="{{ url_for('browse', target='vault_path', staging_path=staging_path, promote_interval_minutes=promote_interval_minutes, wv_syncthing_folder_id=wv_syncthing_folder_id) }}">Browse&hellip;</a>
       </div>
       <label for="wv-interval">Promote interval (minutes)</label>
       <input type="number" id="wv-interval" name="promote_interval_minutes" value="{{ promote_interval_minutes }}" min="1">
@@ -59,6 +59,8 @@
         <input type="checkbox" id="wv-keep-failed" name="keep_failed_staging" checked>
         <label for="wv-keep-failed">Keep a copy of staging if a promotion fails</label>
       </div>
+      <label for="wv-syncthing">Syncthing folder ID (optional — shows real sync state on the dashboard)</label>
+      <input type="text" id="wv-syncthing" name="syncthing_folder_id" value="{{ wv_syncthing_folder_id }}" placeholder="e.g. abcde-fghij">
       <button type="submit">Add WeChat Vault folder</button>
     </fieldset>
   </form>

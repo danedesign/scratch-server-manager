@@ -219,6 +219,11 @@ class Manager:
                 else:
                     status_label, reason = "failed", f"{result.reason} ({next_run_note})"
 
+            if cfg.syncthing_folder_id:
+                syncthing_status = get_folder_status(cfg.syncthing_folder_id)
+                if syncthing_status is not None:
+                    reason = f"{reason} ({summarize_status(syncthing_status)})"
+
             rows.append(FolderStatus(
                 profile="wechat_vault",
                 path=str(staging_path),

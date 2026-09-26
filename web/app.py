@@ -37,6 +37,7 @@ def create_app(manager) -> Flask:
             staging_path=request.args.get("staging_path", ""),
             vault_path=request.args.get("vault_path", ""),
             promote_interval_minutes=request.args.get("promote_interval_minutes", "60"),
+            wv_syncthing_folder_id=request.args.get("wv_syncthing_folder_id", ""),
             error=request.args.get("error", ""),
         )
 
@@ -79,6 +80,7 @@ def create_app(manager) -> Flask:
         vault_path = request.form.get("vault_path", "").strip()
         interval_raw = request.form.get("promote_interval_minutes", "60").strip()
         keep_failed_staging = request.form.get("keep_failed_staging") == "on"
+        syncthing_folder_id = request.form.get("syncthing_folder_id", "").strip()
 
         def back(error: str):
             return redirect(url_for(
@@ -87,6 +89,7 @@ def create_app(manager) -> Flask:
                 staging_path=staging_path,
                 vault_path=vault_path,
                 promote_interval_minutes=interval_raw,
+                wv_syncthing_folder_id=syncthing_folder_id,
             ))
 
         if not staging_path or not vault_path:
@@ -102,13 +105,16 @@ def create_app(manager) -> Flask:
         except ValueError:
             return back("Promote interval must be a positive integer")
 
-        append_folder(manager.config_path, {
+        entry = {
             "profile": "wechat_vault",
             "staging_path": staging_path,
             "vault_path": vault_path,
             "promote_interval_minutes": promote_interval_minutes,
             "keep_failed_staging": keep_failed_staging,
-        })
+        }
+        if syncthing_folder_id:
+            entry["syncthing_folder_id"] = syncthing_folder_id
+        append_folder(manager.config_path, entry)
         return redirect(url_for("status"))
 
     @app.route("/folders/hot_data/edit")
@@ -168,6 +174,7 @@ def create_app(manager) -> Flask:
             vault_path=request.args.get("vault_path", str(cfg.vault_path)),
             promote_interval_minutes=request.args.get("promote_interval_minutes", str(cfg.promote_interval_minutes)),
             keep_failed_staging=cfg.keep_failed_staging,
+            syncthing_folder_id=request.args.get("syncthing_folder_id", cfg.syncthing_folder_id or ""),
             error=request.args.get("error", ""),
         )
 
@@ -177,6 +184,7 @@ def create_app(manager) -> Flask:
         vault_path = request.form.get("vault_path", "").strip()
         interval_raw = request.form.get("promote_interval_minutes", "").strip()
         keep_failed_staging = request.form.get("keep_failed_staging") == "on"
+        syncthing_folder_id = request.form.get("syncthing_folder_id", "").strip()
 
         def back(error: str):
             return redirect(url_for(
@@ -185,6 +193,7 @@ def create_app(manager) -> Flask:
                 staging_path=staging_path,
                 vault_path=vault_path,
                 promote_interval_minutes=interval_raw,
+                syncthing_folder_id=syncthing_folder_id,
             ))
 
         if not vault_path:
@@ -202,6 +211,7 @@ def create_app(manager) -> Flask:
             "vault_path": vault_path,
             "promote_interval_minutes": promote_interval_minutes,
             "keep_failed_staging": keep_failed_staging,
+            "syncthing_folder_id": syncthing_folder_id or None,
         })
         return redirect(url_for("status"))
 

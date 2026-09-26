@@ -131,6 +131,20 @@ def test_syncthing_folder_id_parses_when_present(tmp_path):
     assert configs[0].syncthing_folder_id == "abcde-fghij"
 
 
+def test_wechat_vault_syncthing_folder_id_is_optional(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, "folders:\n- profile: wechat_vault\n  staging_path: /a\n  vault_path: /b\n")
+    configs = load_config(cfg_path)
+    assert configs[0].syncthing_folder_id is None
+
+
+def test_wechat_vault_syncthing_folder_id_parses_when_present(tmp_path):
+    cfg_path = tmp_path / "folders.yaml"
+    write(cfg_path, "folders:\n- profile: wechat_vault\n  staging_path: /a\n  vault_path: /b\n  syncthing_folder_id: wechat-staging\n")
+    configs = load_config(cfg_path)
+    assert configs[0].syncthing_folder_id == "wechat-staging"
+
+
 def test_update_folder_hot_data(tmp_path):
     cfg_path = tmp_path / "folders.yaml"
     write(cfg_path, "folders:\n- profile: hot_data\n  path: /srv/hotdata/documents\n  versions_to_keep: 5\n")

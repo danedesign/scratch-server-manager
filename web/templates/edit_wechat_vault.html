@@ -34,7 +34,7 @@
       <label for="wv-vault">Vault path (the shared, promoted copy)</label>
       <div class="path-row">
         <input type="text" id="wv-vault" name="vault_path" value="{{ vault_path }}">
-        <a class="browse-link" href="{{ url_for('browse', target='vault_path', return_to='edit_wechat_vault_form', staging_path=staging_path, promote_interval_minutes=promote_interval_minutes) }}">Browse&hellip;</a>
+        <a class="browse-link" href="{{ url_for('browse', target='vault_path', return_to='edit_wechat_vault_form', staging_path=staging_path, promote_interval_minutes=promote_interval_minutes, syncthing_folder_id=syncthing_folder_id) }}">Browse&hellip;</a>
       </div>
       <label for="wv-interval">Promote interval (minutes)</label>
       <input type="number" id="wv-interval" name="promote_interval_minutes" value="{{ promote_interval_minutes }}" min="1">
@@ -42,6 +42,8 @@
         <input type="checkbox" id="wv-keep-failed" name="keep_failed_staging" {% if keep_failed_staging %}checked{% endif %}>
         <label for="wv-keep-failed">Keep a copy of staging if a promotion fails</label>
       </div>
+      <label for="wv-syncthing">Syncthing folder ID (optional — shows real sync state on the dashboard)</label>
+      <input type="text" id="wv-syncthing" name="syncthing_folder_id" value="{{ syncthing_folder_id }}" placeholder="e.g. abcde-fghij">
       <button type="submit">Save changes</button>
     </fieldset>
   </form>
