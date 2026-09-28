@@ -119,6 +119,56 @@ routine day-to-day sync, which just happens automatically.
    **Promote now** (or let the schedule catch it).
 9. Only delete the step-4 backup after step 8's Verify comes back clean.
 
+## Backing up the VM and the WeChat vault to an external archive drive
+
+Two separate, complementary layers — don't conflate them. The VM itself
+(Debian + Sync Manager) isn't precious: it's fully rebuildable from this
+repo and this file in under an hour. The **WeChat data inside it** is what's
+actually irreplaceable, so it gets the stronger (continuous) protection.
+
+**Important context specific to this setup**: the Debian VM runs as a
+VMware guest *on top of* DL-Work's own Windows 11 — not on separate
+hardware. That means wiping DL-Work's Windows install would destroy the VM
+(and everything in it) unless it's been copied out first, **in addition
+to** destroying the *live* WeChat installation, which runs directly on
+Windows, outside the VM entirely. Both need covering; neither is covered
+by the other.
+
+**Layer 1 — one-time (or occasional) full VM copy, for disaster recovery
+of the appliance itself:**
+
+1. **Pause** the WeChat Vault folder on the dashboard, so a scheduled
+   auto-promote can't fire mid-copy.
+2. **Shut the VM down cleanly** — `sudo shutdown now` inside Debian, not
+   Suspend. A fully powered-off `.vmdk` is already consistent on its own;
+   no snapshot needed first (a snapshot is for checkpointing a VM you plan
+   to keep running/resume later, not for a full offline copy — taking one
+   here would only add delta files to manage for no benefit).
+3. **Copy the entire VM folder** (`.vmx`, `.vmdk`(s), `.nvram`, everything
+   together — wherever VMware Workstation stores this VM's files on the
+   Windows host) to the archive drive.
+4. **Power the VM back on**, then **Resume** the WeChat Vault folder on
+   the dashboard.
+
+This doesn't need to capture a WeChat-data-free state — whatever's in the
+vault at copy time comes along for free, as a bonus snapshot. Its
+*freshness* going forward is Layer 2's job, not this one's. Re-run Layer 1
+only after real changes to the VM/Sync Manager setup itself (a new
+version deployed, a new folder configured) — not on a fixed schedule.
+
+**Layer 2 — continuous incremental backup of the WeChat data specifically,
+no downtime:**
+
+Same Syncthing pattern already used for `1aachgk`'s archive, just pointed
+at DL-Work's own attached drive instead: VM's `vault_path` → **Send Only**,
+the archive drive's backup folder → **Receive Only**. Runs continuously in
+the background; no VM downtime, no manual copies, no scheduled task needed.
+This is the layer that actually keeps pace with new messages — Layer 1
+alone, even done weekly, would leave up to a week of exposure; this closes
+that gap to effectively real-time.
+
+**Status not yet started** as of this writing — planned, not executed.
+
 ## Checking sync status / troubleshooting a stuck sync
 
 - **Dashboard status row** is the first thing to check — it already
