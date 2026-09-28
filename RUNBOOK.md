@@ -162,3 +162,44 @@ No build step needed:
 
 To rebuild it yourself instead (e.g. after changing `desktop-app/launcher.py`):
 see `desktop-app/README.md`.
+
+---
+
+## Related infrastructure (not Sync Manager itself, but decided/tracked here)
+
+### Setting up a macOS VM on DL-Work (planned, not yet started)
+
+**Decision** (see `TIMELINE.md` 2026-09-28 for the full reasoning): DL-Work
+stays bare-metal Windows 11 — a Debian+GPU-passthrough rebuild was
+researched and rejected (regression on CPU headroom, and real GPU-accelerated
+macOS is a hard blocker on its GTX 1080 regardless of host OS, since NVIDIA
+hasn't shipped a macOS driver newer than early Pascal since Mojave). Instead:
+a software-rendered **macOS Sequoia** VM via **VMware Workstation Pro +
+the community "Unlocker" patch** ([DrDonk/unlocker](https://github.com/DrDonk/unlocker)),
+running alongside the existing Windows 11 install — fine for light dev/testing,
+not for anything graphics-heavy.
+
+1. **Check for Hyper-V/VBS conflicts** — these force VMware into a slower
+   compatibility mode. Run in an Administrator PowerShell on DL-Work:
+   ```powershell
+   Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All, VirtualMachinePlatform, HypervisorPlatform
+   ```
+   Disable any that show `Enabled`. (Windows' *Virtualization-based
+   security* setting was already confirmed off via `msinfo32` — this is
+   the separate Hyper-V feature check.)
+2. Install **VMware Workstation Pro** (check current licensing on
+   Broadcom's site — was made free for personal use as of the 2024
+   ownership change, but confirm before installing).
+3. Close VMware completely, then run the **Unlocker** patch from the repo
+   above — adds macOS as a selectable guest OS type.
+4. Get a real macOS Sequoia installer via `gibMacOS` (pulls directly from
+   Apple's own public software-update servers) rather than any
+   third-party image.
+5. Create the VM (Unlocker handles the SMBIOS/VMX patching macOS guests
+   need), install Sequoia, then install VMware Tools for macOS (also
+   provided by Unlocker, since Broadcom's official builds don't include
+   Mac guest tools) for proper resolution/clipboard support.
+
+This section will move into a normal numbered procedure once actually
+completed and verified — right now it's a plan, not a confirmed-working
+recipe.
